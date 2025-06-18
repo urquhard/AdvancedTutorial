@@ -3,7 +3,7 @@
 Hands-on machine learning tutorial based on the ALPHA-g reconstruction.
 
 **Start here:**
-[ML Tutorial](https://alpha-g-experiment.github.io/ml-tutorial/)
+[ML Tutorial](https://trisep-2025-ml-tutorials.github.io/AdvancedTutorial/)
 
 All required code is available in the `code/` directory.
 
