@@ -53,7 +53,7 @@ characteristics of the data**.
 >   will require special handling in the model architecture.
 
 To help you answer these questions, we've provided the script:
-`ml-tutorial/code/visualization.py`.
+`AdvancedTutorial/code/visualization.py`.
 
 You can run it directly to visualize key properties of a dataset:
 ```bash
