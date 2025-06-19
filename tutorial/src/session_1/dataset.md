@@ -1,18 +1,23 @@
 # Exploring the Data
 
 Each annihilation event produces a number of charged particles that leave a
-trail of hits in the ALPHA-g detector.
+trail of hits in the ALPHA-g detector. We have prepared a dataset with 100,000
+events:
 
-Each event in the dataset (`ml-tutorial/data/raw_data.parquet`) contains:
+```bash
+/fast_scratch_1/TRISEP_data/AdvancedTutorial/small_dataset.parquet
+```
+
+Each event in the dataset contains:
 - A true vertex position: `(x, y, z)` i.e. the origin of the annihilation.
 - A set of 3D hit positions: `[(x1, y1, z1), ..., (xn, yn, zn)]`.
 
 You can get a quick overview of the dataset by launching a Python interpreter
-from the `ml-tutorial/code` directory and running the following code:
+and running the following code:
 
 ```python
 >>> import polars as pl
->>> df = pl.read_parquet("../data/raw_data.parquet")
+>>> df = pl.read_parquet("/fast_scratch_1/TRISEP_data/AdvancedTutorial/small_dataset.parquet")
 >>> print(df)
 
 """
@@ -70,16 +75,17 @@ training/batching process.
 We've provided a
 [PyTorch-compatible dataset class](https://github.com/TRISEP-2025-ML-tutorials/AdvancedTutorial/blob/main/code/data/dataset.py#L5-L50).
 It wraps a `.parquet` file and gives you easy access to the data in a
-PyTorch-friendly way. Create a new Python script in the `ml-tutorial/code`
-directory:
+PyTorch-friendly way. Create a new Python script:
 
 ```python
 from data.dataset import PointCloudDataset
 
 config = {"cloud_size": 140}
-dataset = PointCloudDataset("../data/raw_data.parquet", config)
+dataset = PointCloudDataset(
+    "/fast_scratch_1/TRISEP_data/AdvancedTutorial/small_dataset.parquet", config
+)
 
-index = 0 # First event
+index = 0  # First event
 point_cloud, target = dataset[index]
 ```
 
