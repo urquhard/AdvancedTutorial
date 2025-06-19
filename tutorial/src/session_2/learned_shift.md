@@ -4,9 +4,9 @@ Now that you understand the full structure of the model, it's time to explore a
 simple but effective improvement.
 
 As you saw in the previous section, the model has an
-[inner `_TNet`](https://github.com/ALPHA-g-Experiment/ml-tutorial/blob/e23bb159fc8c5bc7782a5474e89dc542403a7740/code/model/regressor.py#L95-L97)
+[inner `_TNet`](https://github.com/TRISEP-2025-ML-tutorials/AdvancedTutorial/blob/main/code/model/regressor.py#L95-L97)
 that learns the coefficients of a matrix used to
-[align the abstract features](https://github.com/ALPHA-g-Experiment/ml-tutorial/blob/e23bb159fc8c5bc7782a5474e89dc542403a7740/code/model/regressor.py#L120-L123).
+[align the abstract features](https://github.com/TRISEP-2025-ML-tutorials/AdvancedTutorial/blob/main/code/model/regressor.py#L120-L123).
 This **feature alignment** allows the network to adaptively transform the point
 features, often leading to better performance.
 

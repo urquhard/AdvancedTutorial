@@ -68,7 +68,7 @@ class that allows us to decouple the data loading from the model
 training/batching process.
 
 We've provided a
-[PyTorch-compatible dataset class](https://github.com/ALPHA-g-Experiment/ml-tutorial/blob/main/code/data/dataset.py).
+[PyTorch-compatible dataset class](https://github.com/TRISEP-2025-ML-tutorials/AdvancedTutorial/blob/main/code/data/dataset.py#L5-L50).
 It wraps a `.parquet` file and gives you easy access to the data in a
 PyTorch-friendly way. Create a new Python script in the `ml-tutorial/code`
 directory:
@@ -88,7 +88,7 @@ targets (annihilation vertices).
 
 > **Activity:**  
 > - Inspect the
->   [`PointCloudDataset`](https://github.com/ALPHA-g-Experiment/ml-tutorial/blob/main/code/data/dataset.py#L5-L50)
+>   [`PointCloudDataset`](https://github.com/TRISEP-2025-ML-tutorials/AdvancedTutorial/blob/main/code/data/dataset.py#L5-L50)
 >   class. How does it handle variable-length point clouds?
 > - Using the first 10 events (indices 0-9), plot the point clouds and their
 >   targets. Do they look like you expected?  

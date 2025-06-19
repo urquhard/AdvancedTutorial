@@ -4,9 +4,9 @@ Now that your data is prepared, let's train a model that predicts the vertex
 position from detector hits.
 
 We've provided a 
-[reference model](https://github.com/ALPHA-g-Experiment/ml-tutorial/blob/main/code/model/regressor.py)
-and
-[training script](https://github.com/ALPHA-g-Experiment/ml-tutorial/blob/main/code/train.py),
+[pre-built model](https://github.com/TRISEP-2025-ML-tutorials/AdvancedTutorial/blob/main/code/model/regressor.py)
+and a
+[training script](https://github.com/TRISEP-2025-ML-tutorials/AdvancedTutorial/blob/main/code/train.py),
 which you can run like:
 
 ```bash
@@ -32,7 +32,7 @@ monitor training progress.
 
 Once the model is trained, you can evaluate how well it performs on the
 validation set using the provided
-[test script](https://github.com/ALPHA-g-Experiment/ml-tutorial/blob/main/code/test.py):
+[test script](https://github.com/TRISEP-2025-ML-tutorials/AdvancedTutorial/blob/main/code/test.py):
 
 ```bash
 python test.py /path/to/model.pt /path/to/validate.parquet --output /path/to/output.csv
@@ -57,7 +57,7 @@ You've now trained and evaluated a baseline model. Let's tweak one component to
 see what happens!
 
 Try changing the loss function
-[here](https://github.com/ALPHA-g-Experiment/ml-tutorial/blob/main/code/training/loss.py#L25)
+[here](https://github.com/TRISEP-2025-ML-tutorials/AdvancedTutorial/blob/main/code/training/loss.py#L25)
 from **Mean Squared Error** to
 [**Mean Absolute Error**](https://docs.pytorch.org/docs/stable/generated/torch.nn.functional.l1_loss.html).
 
