@@ -75,7 +75,8 @@ training/batching process.
 We've provided a
 [PyTorch-compatible dataset class](https://github.com/TRISEP-2025-ML-tutorials/AdvancedTutorial/blob/main/code/data/dataset.py#L5-L50).
 It wraps a `.parquet` file and gives you easy access to the data in a
-PyTorch-friendly way. Create a new Python script:
+PyTorch-friendly way. Create a new Python script in the `AdvancedTutorial/code/`
+directory:
 
 ```python
 from data.dataset import PointCloudDataset
