@@ -10,3 +10,10 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Keras model files
+*.h5
+*.keras
+
+# MacOS system files
+.DS_Store

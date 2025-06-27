@@ -13,6 +13,7 @@ import gc
 import matplotlib.pyplot as plt
 import polars as pl
 from sklearn.model_selection import train_test_split
+from torch import embedding
 
 pd.set_option('display.max_columns', None)
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
@@ -491,109 +492,271 @@ print(f"X_train shape: {X_train.shape}, y_train shape: {y_train.shape}")
 
 # %%
 
-class DeepSet(k.Model):
-    def __init__(self,
-                 phi_units=(64, 64),
-                 rho_units=(64, 64),
-                 output_units=1,
-                 aggregator='max',  # 'max' often works better than 'sum'
-                 dropout=0.3,       # Moderate dropout
-                 l2_reg=1e-4,       # Light L2 regularization
-                 **kwargs):
-        super().__init__(**kwargs)
-        self.aggregator = aggregator
+# class DeepSet(k.Model):
+#     def __init__(self,
+#                  phi_units=(512),
+#                  rho_units=(256),
+#                  embed_dim = 1024,
+#                  output_units=1,
+#                  aggregator='max',  # 'max' often works better than 'sum'
+#                  dropout=0.3,       # Moderate dropout
+#                  l2_reg=1e-4,       # Light L2 regularization
+#                  **kwargs):
+#         super().__init__(**kwargs)
+#         self.aggregator = aggregator
         
-        # L2 regularizer
+#         # L2 regularizer
+#         regularizer = k.regularizers.l2(l2_reg)
+
+#         # φ network: maps each point → embedding with regularization
+#         phi_layers = []
+#         for u in phi_units:
+#             phi_layers.append(k.layers.Dense(u, 
+#                                            activation=None,
+#                                            kernel_regularizer=regularizer))
+#             phi_layers.append(k.layers.BatchNormalization())
+#             phi_layers.append(k.layers.Activation('elu'))
+#             if dropout > 0:
+#                 phi_layers.append(k.layers.Dropout(dropout))
+#         self.phi = tf.keras.Sequential(phi_layers)
+
+#         # ρ network: maps aggregated embedding → output with regularization
+#         rho_layers = []
+#         for u in rho_units:
+#             rho_layers.append(k.layers.Dense(u, 
+#                                            activation=None,
+#                                            kernel_regularizer=regularizer))
+#             rho_layers.append(k.layers.BatchNormalization())
+#             rho_layers.append(k.layers.Activation('elu'))
+#             if dropout > 0:
+#                 rho_layers.append(k.layers.Dropout(dropout))
+#         rho_layers.append(k.layers.Dense(embed_dim, 
+#                                        activation=None,
+#                                        kernel_regularizer=regularizer))
+#         self.rho = tf.keras.Sequential(rho_layers)
+    
+#     def deepset_block:
+
+
+    # def call(self, x, training=False):
+    #     # x: (batch, n_points, features)
+    #     h = self.phi(x, training=training)   # → (batch, n_points, φ_dim)
+    #     if self.aggregator == 'mean':
+    #         s = tf.reduce_mean(h, axis=1)
+    #     elif self.aggregator == 'max':
+    #         s = tf.reduce_max(h, axis=1)
+    #     else:  # 'sum'
+    #         s = tf.reduce_sum(h, axis=1)
+            
+    #     y = self.rho(s, training=training)   # → (batch, output_units)
+    #     return tf.squeeze(y, axis=-1)        # → (batch,)
+
+        
+# %%
+
+class DeepSetBlock(layers.Layer):
+    """
+    A modular DeepSet block with a residual connection.
+    Processes point features and adds global context back to each point.
+    """
+    def __init__(self, phi_units, rho_units, dropout=0.3, l2_reg=1e-4, **kwargs):
+        super().__init__(**kwargs)
         regularizer = k.regularizers.l2(l2_reg)
 
-        # φ network: maps each point → embedding with regularization
-        phi_layers = []
-        for u in phi_units:
-            phi_layers.append(k.layers.Dense(u, 
-                                           activation=None,
-                                           kernel_regularizer=regularizer))
-            phi_layers.append(k.layers.BatchNormalization())
-            phi_layers.append(k.layers.Activation('elu'))
-            if dropout > 0:
-                phi_layers.append(k.layers.Dropout(dropout))
-        self.phi = tf.keras.Sequential(phi_layers)
+        # 1. Phi Network (Encoder): Processes each point independently
+        self.phi = k.Sequential([
+            layers.Dense(u, activation=None, kernel_regularizer=regularizer) for u in phi_units
+        ] + [
+            layers.BatchNormalization(),
+            layers.Activation('elu'),
+            layers.Dropout(dropout)
+        ])
 
-        # ρ network: maps aggregated embedding → output with regularization
-        rho_layers = []
-        for u in rho_units:
-            rho_layers.append(k.layers.Dense(u, 
-                                           activation=None,
-                                           kernel_regularizer=regularizer))
-            rho_layers.append(k.layers.BatchNormalization())
-            rho_layers.append(k.layers.Activation('elu'))
-            if dropout > 0:
-                rho_layers.append(k.layers.Dropout(dropout))
-        rho_layers.append(k.layers.Dense(output_units, 
-                                       activation=None,
-                                       kernel_regularizer=regularizer))
-        self.rho = tf.keras.Sequential(rho_layers)
+        # 2. Rho Network (Global Processor): Processes the aggregated features
+        self.rho = k.Sequential([
+            layers.Dense(u, activation=None, kernel_regularizer=regularizer) for u in rho_units
+        ] + [
+            layers.BatchNormalization(),
+            layers.Activation('elu'),
+            layers.Dropout(dropout)
+        ])
 
     def call(self, x, training=False):
-        # x: (batch, n_points, features)
-        h = self.phi(x, training=training)   # → (batch, n_points, φ_dim)
+        # Input x: (B, L, C) - A set of point features
+
+        # 1. Encode each point with the Phi network
+        point_features = self.phi(x, training=training) # (B, L, C_phi)
+
+        # 2. Aggregate to get a global feature vector
+        global_feature = tf.reduce_max(point_features, axis=1) # (B, C_phi)
+
+        # 3. Process the global feature with the Rho network
+        global_context = self.rho(global_feature, training=training) # (B, C_rho)
+
+        # 4. Add global context back to each point feature (Residual Stream)
+        # To do this, we need to expand the dimensions of the global context
+        # from (B, C_rho) to (B, 1, C_rho) so it can be broadcasted
+        global_context_expanded = tf.expand_dims(global_context, axis=1)
+
+        # The output of the block is the new set of point features
+        # It combines the original processed points with global information
+        return point_features + global_context_expanded # (B, L, C_phi)
+
+
+class DeepSet(k.Model):
+    """
+    A deep, residual model built by stacking DeepSetBlocks.
+    """
+    def __init__(self, embed_dim=128, num_blocks=3, dropout=0.3, l2_reg=1e-4, **kwargs):
+        super().__init__(**kwargs)
+
+        # Initial embedding layer to project input (3 dims) to our working dimension
+        self.embedding = layers.Dense(embed_dim, activation='elu')
+
+        # Stack multiple DeepSetBlocks
+        # Each block will have the same internal architecture
+        self.blocks = [
+            DeepSetBlock(
+                phi_units=[embed_dim, embed_dim],
+                rho_units=[embed_dim, embed_dim],
+                dropout=dropout,
+                l2_reg=l2_reg
+            ) for _ in range(num_blocks)
+        ]
+
+        # Final prediction head
+        self.prediction_head = k.Sequential([
+            layers.Dense(256, activation='elu'),
+            layers.Dropout(dropout),
+            layers.Dense(128, activation='elu'),
+            layers.Dense(1) # Final regression output
+        ])
+
+    def call(self, x, training=False):
+        # x: (B, L, 3)
+
+        # 1. Initial embedding
+        x = self.embedding(x) # (B, L, embed_dim)
+
+        # 2. Pass through all the stacked blocks
+        for block in self.blocks:
+            x = block(x, training=training) # (B, L, embed_dim)
+
+        # 3. Final aggregation to get one global vector for prediction
+        final_global_feature = tf.reduce_max(x, axis=1) # (B, embed_dim)
+
+        # 4. Get the final prediction
+        prediction = self.prediction_head(final_global_feature, training=training) # (B, 1)
         
-        if self.aggregator == 'mean':
-            s = tf.reduce_mean(h, axis=1)
-        elif self.aggregator == 'max':
-            s = tf.reduce_max(h, axis=1)
-        else:  # 'sum'
-            s = tf.reduce_sum(h, axis=1)
-            
-        y = self.rho(s, training=training)   # → (batch, output_units)
-        return tf.squeeze(y, axis=-1)        # → (batch,)
+        return tf.squeeze(prediction, axis=-1)
 
 # %%
-# Create regularized vanilla DeepSet
+
+# # Create regularized vanilla DeepSet
+# model = DeepSet(
+#     phi_units=(512),
+#     rho_units=(256),
+#     output_units=1,
+#     aggregator='max',
+#     dropout=0.2,               # Moderate dropout
+#     l2_reg=1e-2                # Light L2 regularization
+# )
+
+# # Compile with reasonable learning rate
+# model.compile(
+#     optimizer=k.optimizers.Adam(learning_rate=1e-3),
+#     loss='mse',
+#     metrics=['mae']
+# )
+
+# # Simple callbacks
+# callbacks = [
+#     k.callbacks.EarlyStopping(
+#         monitor='val_loss',
+#         patience=8,
+#         restore_best_weights=True
+#     )
+# ]
+
+# # Train
+# history = model.fit(
+#     data_transposed,
+#     np_labels,
+#     batch_size=128,
+#     epochs=50,
+#     validation_split=0.2,
+#     callbacks=callbacks,
+#     verbose=1
+# )
+
+
+
+# %%
+# Create the new stacked DeepSet model
 model = DeepSet(
-    phi_units=(1024, 1024, 1024, 1024),
-    rho_units=(128, 128, 128, 128),
-    output_units=1,
-    aggregator='max',
-    dropout=0.2,               # Moderate dropout
-    l2_reg=1e-2                # Light L2 regularization
+    embed_dim=1024,
+    num_blocks=5,
+    dropout=0.2,
+    l2_reg=1e-4
 )
 
-# Compile with reasonable learning rate
+# Compile with a suitable learning rate and optimizer
 model.compile(
     optimizer=k.optimizers.Adam(learning_rate=1e-3),
     loss='mse',
     metrics=['mae']
 )
 
-# Simple callbacks
+# Callbacks for stable training
 callbacks = [
-    k.callbacks.EarlyStopping(
-        monitor='val_loss',
-        patience=8,
-        restore_best_weights=True
-    )
+    k.callbacks.EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True),
+    k.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=4)
 ]
 
-# Train
+# Train the model
 history = model.fit(
-    data_transposed,
-    np_labels,
-    batch_size=128,
+    X_train,
+    y_train,
+    batch_size=512,
     epochs=50,
-    validation_split=0.2,
+    validation_data=(X_val, y_val),
     callbacks=callbacks,
     verbose=1
 )
+
 # %%
 
+MODEL_NAME = "deepset_residual"
+
+# # # Save the model 
+# model.save(f"{MODEL_NAME}_model.keras")
+
+# %%
+# print then number of parameters in the model
+num_params = model.count_params()
+print(f"Number of parameters in the model: {num_params:,}")
+
+# %%
+
+SAVE_PLOTS = True
+
+# %%
 history = model.history.history
-plt.plot(history['loss'], label='Training Loss')
-plt.plot(history['val_loss'], label='Validation Loss')
+start_epoch = 5
+
+# Create an x-axis that reflects the true epoch number
+# Note: Keras history is 0-indexed, so we plot from index 5 onwards
+epoch_range = range(start_epoch, len(history['loss']))
+
+plt.plot(epoch_range, history['loss'][start_epoch:], label='Training Loss')
+plt.plot(epoch_range, history['val_loss'][start_epoch:], label='Validation Loss')
 plt.xlabel('Epochs')
 plt.ylabel('Loss')
-plt.title('DeepSet Training and Validation Loss')
+plt.title(f'Training and Validation Loss (from Epoch {start_epoch + 1})')
+if SAVE_PLOTS:
+    plt.savefig(f"{MODEL_NAME}_loss_from_epoch_5.png")
 plt.legend()
-plt.show() 
+plt.show()
 # %%
 # from model.regressor import Regressor
 
@@ -616,6 +779,8 @@ plt.title("DeepSet Prediction vs. True Value")
 plt.legend()
 plt.grid(True)
 plt.axis('equal') # Ensures the y=x line is at 45 degrees
+if SAVE_PLOTS:
+    plt.savefig(f"{MODEL_NAME}_predictions_vs_true.png")
 plt.show()
 
 # %%
@@ -638,6 +803,10 @@ plt.text(0.95, 0.95, f'Mean Error: {mean_error:.2f}\nStd Dev: {std_error:.2f}',
 
 plt.legend()
 plt.grid(True)
+
+if SAVE_PLOTS:
+    plt.savefig(f"{MODEL_NAME}_residuals_histogram.png")
+
 plt.show()
 
 # %%
@@ -649,5 +818,9 @@ plt.xlabel("Predicted Values")
 plt.ylabel("Residuals (True - Predicted)")
 plt.title("Residuals vs. Predicted Values")
 plt.grid(True)
+
+if SAVE_PLOTS:
+    plt.savefig(f"{MODEL_NAME}_residuals_vs_predictions.png")
+
 plt.show()
 # %%
